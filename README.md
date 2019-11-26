@@ -20,7 +20,6 @@ The grades should be laid out as _columns_ in _one sheet_. They should span a _c
 * The tools only updates the _draft_ grades. After using it, make sure the grades are OK, then publish them using Google Classroom's grade book (just a couple more clicks to make sure nothing crazy happened)!
 * Any non-existing assignments _will be created_.
 * Avoid using _merged_ cells for the ranges accessed by the tool.
-* _Last Row_ must be strictly greater than _First Row_.
 
 ## Usage
 
