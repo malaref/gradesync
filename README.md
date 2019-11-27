@@ -42,8 +42,12 @@ For extra convenience, a version of the tool is [hosted on Heroku](https://grade
 
 ### Security and Privacy
 
-All communications between your browser, the server and Google's APIs use SSL encryption and an error should occur in case of any insecure communication. The access token granted from Google (with your consent) is stored in your browser cookie and it is not saved in any sort of database on the server. (However, it may be logged through the typical operational logs emitted by the specific server running it because it is sent as a part of the route.) When you send a request, the token (in the cookie) is sent by your browser and it is used to communicate with Google's APIs on your behalf to sync the grades. Whenever an error occurs (due to malformed requests, unforeseen bugs or changes in Google's APIs), the access token is revoked and you will be asked by Google for permission to grant another one.
+All communications between your browser, the server and Google's APIs use the HTTPS protocol and an error should occur in case of any insecure communication. The access token granted from Google (with your consent) is stored in your browser cookie and it is not saved in any sort of database on the server. (However, it may be logged through the typical operational logs emitted by the specific server running it because it is sent as a part of the route.) When you send a request, the token (in the cookie) is sent by your browser and it is used to communicate with Google's APIs on your behalf to sync the grades. Whenever an error occurs (due to malformed requests, unforeseen bugs or changes in Google's APIs), the access token is revoked and you will be asked by Google for permission to grant another one. You may want to review the [Heroku security policy](https://www.heroku.com/policy/security) as well!
+
+**LIMITATION** For this hosted setting to work, all the updates must be done within a timeout period, which is currently set to 10 minutes. Initial testing suggest that the server makes ~50 updates per minute. Therefore, it might be a good idea to split the updates for large classes over multiple requests.
 
 ## License and Guarantees
 
-This is a free open-source tool and it is offered _as is_ with no guarantees whatsoever (see LICENSE for details). **Use it at your own risk!**
+This is a free open-source tool and it is offered _as is_ with no guarantees whatsoever (see LICENSE for details).
+
+**Use it at your own risk!**
