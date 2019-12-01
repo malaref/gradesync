@@ -9,6 +9,34 @@
     <script src="https://code.jquery.com/jquery-3.4.1.min.js" integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo=" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/semantic-ui@2.4.2/dist/semantic.min.js"></script>
     <script>
+    function poll() {
+      var form = $('#sync_form');
+      $.getJSON('/poll').done(function(data) {
+        form.removeClass('loading disabled');
+        if (data.length > 0) {
+          var warnings_list = $('#warnings_list');
+          warnings_list.empty();
+          for (var i = 0; i < data.length; i++) {
+            warnings_list.append('<li>' + data[i] + '</li>');
+          }
+          form.addClass('warning');
+        }
+        else {
+          form.addClass('success');
+        }
+      }).fail(function(jqXHR) {
+        switch (jqXHR.status) {
+          case 404:
+            form.removeClass('loading disabled');
+            break;
+          case 423:
+            setTimeout(poll, 1000);
+            break;
+          default:
+            form.removeClass('loading disabled').addClass('error');
+        }
+      });
+    }
     $(document).ready(function() {
       $('.ui.form').form({
         fields: {
@@ -41,34 +69,12 @@
         inline: true,
         onSuccess: function() {
           var form = $('#sync_form');
-          form.removeClass('success').removeClass('warning').removeClass('error');
-          $.ajax({
-            url: $('#sync_form').attr('action'),
-            type: 'POST',
-            data : $('#sync_form').serialize(),
-            success: function(data) {
-              form.removeClass('loading').removeClass('disabled');
-              if (data.length > 0) {
-                var warnings_list = $('#warnings_list');
-                warnings_list.empty();
-                for (var i = 0; i < data.length; i++) {
-                  warnings_list.append('<li>' + data[i] + '</li>');
-                }
-                form.addClass('warning');
-              }
-              else {
-                form.addClass('success');
-              }
-            },
-            error: function() {
-              form.removeClass('loading').removeClass('disabled');
-              $('#sync_form').removeClass('loading').addClass('error');
-            }
-          });
-          $('#sync_form').addClass('loading disabled');
+          form.removeClass('success warning error').addClass('loading disabled');
+          $.post('/start', form.serialize()).done(poll).fail(function() {form.removeClass('loading disabled').addClass('error');});
           return false;
         }
       });
+      poll();
     });
     </script>
   </head>
@@ -80,7 +86,7 @@
         </div>
       </h1>
       <div class="ui large center aligned raised segment">
-        <form class="ui form left aligned padded basic segment" id="sync_form">
+        <form class="ui form left aligned padded basic segment loading disabled" id="sync_form">
           <div class="field">
             <label>Course</label>
             <select class="ui selection dropdown" id="course" name="course_id">

@@ -1,4 +1,6 @@
 from os import environ
+from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 from flask import *
 from werkzeug.exceptions import InternalServerError
 from requests import post
@@ -16,28 +18,45 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly', 'https://www.
 app = Flask(__name__)
 app.secret_key = environ['FLASK_SECRET']
 
+executor = ThreadPoolExecutor()
+jobs = {}
 
-@app.route('/sync', methods=['GET'])
-def sync_get():
+
+@app.route('/', methods=['GET'])
+def index():
     if 'credentials' not in session:
         return redirect('authorize')
     credentials = Credentials(**session['credentials'])
     classroom = build('classroom', 'v1', credentials=credentials)
-    
     session['credentials'] = credentials_to_dict(credentials)
-    return render_template('sync.html', courses=get_courses(classroom), fields=CONFIG_FIELDS)
+    return render_template('index.html', courses=get_courses(classroom), fields=CONFIG_FIELDS)
 
 
-@app.route('/sync', methods=['POST'])
-def sync_post():
+@app.route('/start', methods=['POST'])
+def start():
+    if 'job' in session:
+        return jsonify({}), 429
     if 'credentials' not in session:
-        return redirect('authorize')
+        return jsonify({}), 401
     credentials = Credentials(**session['credentials'])
     sheets = build('sheets', 'v4', credentials=credentials)
     classroom = build('classroom', 'v1', credentials=credentials)
-    
     session['credentials'] = credentials_to_dict(credentials)
-    return jsonify(sync(sheets, classroom, config=request.form))
+    session['job'] = uuid4().hex
+    jobs[session['job']] = executor.submit(sync, sheets=sheets, classroom=classroom, config=request.form)
+    return 'Syncing started!', 202
+
+
+@app.route('/poll', methods=['GET'])
+def poll():
+    if 'job' not in session:
+        return jsonify({}), 404
+    job = jobs.pop(session['job'])
+    if job.done():
+        del session['job']
+        return jsonify(job.result())
+    jobs[session['job']] = job
+    return jsonify({}), 423
 
 
 @app.route('/authorize')
@@ -58,18 +77,21 @@ def oauth2callback():
     flow.fetch_token(authorization_response=authorization_response)
     credentials = flow.credentials
     session['credentials'] = credentials_to_dict(credentials)
-    return redirect(url_for('sync_get'))
+    return redirect(url_for('index'))
 
 
 @app.errorhandler(InternalServerError)
 def handle_500(e):
+    if 'job' in session:
+        job = jobs.pop(session['job'], None)
+        if job: job.cancel()
+        del session['job']
     if 'credentials' in session:
         credentials = Credentials(**session['credentials'])
         del session['credentials']
         revoke = post('https://accounts.google.com/o/oauth2/revoke',
                       params={'token': credentials.token},
                       headers={'content-type': 'application/x-www-form-urlencoded'})
-    
     return 'Token revoked!', 400
 
 
