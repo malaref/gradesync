@@ -10,8 +10,20 @@ CONFIG_FIELDS = ({'name': 'spreadsheet_url', 'label': 'Spreadsheet URL', 'patter
                  {'name': 'grades_columns', 'label': 'Grades Columns (space-separated)', 'pattern': '([A-Z]+ )*[A-Z]+'})
 
 
+def list_resource(classroom, path, **params):
+    resource = classroom
+    for node in path:
+        resource = getattr(resource, node)()
+    response = resource.list(**params).execute()
+    items = response.get(path[-1])
+    while 'nextPageToken' in response:
+        response = resource.list(pageToken=response['nextPageToken'], **params).execute()
+        items.extend(response.get(path[-1]))
+    return items
+
+
 def get_courses(classroom):
-    return classroom.courses().list().execute().get('courses')
+    return list_resource(classroom, ('courses',))
 
 
 def sync(sheets, classroom, config):
@@ -39,8 +51,8 @@ def sync(sheets, classroom, config):
     log = []
     
     sheet_emails = get_values(config['emails_column'])
-    classroom_emails = {student['userId']: student['profile']['emailAddress'] for student in classroom.courses().students().list(courseId=config['course_id']).execute().get('students')}
-    course_works = classroom.courses().courseWork().list(courseId=config['course_id']).execute().get('courseWork')
+    classroom_emails = {student['userId']: student['profile']['emailAddress'] for student in list_resource(classroom, ('courses', 'students'), courseId=config['course_id'])}
+    course_works = list_resource(classroom, ('courses', 'courseWork'), courseId=config['course_id'])
 
     # Syncing grades!
     for column in config['grades_columns'].split():
@@ -49,8 +61,7 @@ def sync(sheets, classroom, config):
         grades = dict(zip(sheet_emails, get_values(column)))
         course_work_id, class_work_log = get_or_create_course_work_id(title, max_points)
         if class_work_log:  log.append(class_work_log)
-        student_submissions = classroom.courses().courseWork().studentSubmissions().list(
-            courseId=config['course_id'], courseWorkId=course_work_id).execute().get('studentSubmissions')
+        student_submissions = list_resource(classroom, ('courses', 'courseWork', 'studentSubmissions'), courseId=config['course_id'], courseWorkId=course_work_id)
         for student_submission in student_submissions:
             student_id = student_submission['userId']
             student_email = classroom_emails[student_id]
