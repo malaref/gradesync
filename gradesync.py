@@ -36,9 +36,10 @@ def sync(sheets, classroom, config):
         return tuple(row[0] if row else None for row in sheets.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=f'{config["sheet_name"]}!{column}{config["first_row"]}:{column}{config["last_row"]}').execute().get('values'))
     
     def get_or_create_course_work_id(title, max_points):
-        for course_work in course_works:
-            if course_work['title'] == title:
-                return course_work['id'], f'Full mark mismatch for {title}' if course_work['maxPoints'] != max_points else None
+        if course_works:
+            for course_work in course_works:
+                if course_work['title'] == title:
+                    return course_work['id'], f'Full mark mismatch for {title}' if course_work['maxPoints'] != max_points else None
         new_course_work = classroom.courses().courseWork().create(courseId=config['course_id'], body={
             'title': title,
             'state': 'PUBLISHED',
